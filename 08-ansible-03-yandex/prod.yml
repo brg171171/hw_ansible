@@ -1,0 +1,18 @@
+---
+all:
+  vars:
+    ansible_user: yc-user
+    ansible_python_interpreter: /usr/bin/python3
+  children:
+    clickhouse:
+      hosts:
+        ch01:
+          ansible_host: "{{ lookup('ansible.builtin.env', 'CH_HOST', default=undef()) }}"
+    vector:
+      hosts:
+        vec01:
+          ansible_host: "{{ lookup('ansible.builtin.env', 'VECTOR_HOST', default=undef()) }}"
+    lighthouse:
+      hosts:
+        lh01:
+          ansible_host: "{{ lookup('ansible.builtin.env', 'LH_HOST', default=undef()) }}"

@@ -1,0 +1,17 @@
+check (QEMU / Debian 12 / prod.yml)
+PLAY RECAP *********************************************************************
+ch01                       : ok=2    changed=1    unreachable=0    failed=0    skipped=8    rescued=0    ignored=0
+lh01                       : ok=4    changed=2    unreachable=0    failed=0    skipped=7    rescued=0    ignored=0
+vec01                      : ok=3    changed=1    unreachable=0    failed=0    skipped=5    rescued=0    ignored=0
+
+first (QEMU / Debian 12 / prod.yml)
+PLAY RECAP *********************************************************************
+ch01                       : ok=11   changed=6    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0
+lh01                       : ok=12   changed=7    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0
+vec01                      : ok=9    changed=6    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0
+
+second (QEMU / Debian 12 / prod.yml)
+PLAY RECAP *********************************************************************
+ch01                       : ok=8    changed=0    unreachable=0    failed=0    skipped=2    rescued=0    ignored=0
+lh01                       : ok=11   changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0
+vec01                      : ok=8    changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0

@@ -1,0 +1,8 @@
+---
+clickhouse_endpoint_host: "{{ lookup('ansible.builtin.env', 'CH_PRIVATE_IP', default=undef()) }}"
+clickhouse_endpoint_port: 8123
+vector_version: "0.50.0-1"
+vector_sha256: "5adf6b72d37e081db50efc21228ddde17f566badacddbed162768fa66ee39eac"
+lighthouse_revision: d701335c25cd1bb9b5155711190bad8ab852c2ce
+lighthouse_sha256: a8eb768368291b9b6eb110acda26d29bbc8396441d3716990901c812924ea37d
+lighthouse_port: 8080

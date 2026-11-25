@@ -1,0 +1,14 @@
+server {
+    listen 127.0.0.1:{{ lighthouse_port }};
+    server_name localhost;
+    root /var/www/lighthouse-{{ lighthouse_revision }};
+    index index.html;
+
+    location / {
+        try_files $uri $uri/ =404;
+    }
+
+    location /clickhouse/ {
+        proxy_pass http://{{ clickhouse_endpoint_host }}:{{ clickhouse_endpoint_port }}/;
+    }
+}

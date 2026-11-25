@@ -1,0 +1,14 @@
+data_dir: /var/lib/vector
+sources:
+  lab_file:
+    type: file
+    include: ["/var/log/vector-lab.log"]
+    read_from: beginning
+sinks:
+  clickhouse:
+    type: clickhouse
+    inputs: [lab_file]
+    endpoint: "http://{{ clickhouse_endpoint_host }}:{{ clickhouse_endpoint_port }}"
+    database: logs
+    table: events
+    skip_unknown_fields: true

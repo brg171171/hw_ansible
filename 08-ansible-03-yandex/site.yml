@@ -1,0 +1,244 @@
+---
+- name: Configure ClickHouse
+  hosts: clickhouse
+  gather_facts: false
+  become: true
+  tags: [clickhouse]
+  tasks:
+    - name: Install Debian ClickHouse packages
+      ansible.builtin.apt:
+        name: [clickhouse-server, clickhouse-client]
+        state: present
+        update_cache: true
+        cache_valid_time: 86400
+
+    - name: Inspect configuration directory
+      ansible.builtin.stat:
+        path: /etc/clickhouse-server
+      register: ch_config
+
+    - name: Configure installed ClickHouse
+      when: not ansible_check_mode or ch_config.stat.exists
+      block:
+        - name: Create drop-in directory
+          ansible.builtin.file:
+            path: /etc/clickhouse-server/config.d
+            state: directory
+            mode: "0755"
+
+        - name: Configure IPv4 listener
+          ansible.builtin.copy:
+            content: "<yandex><listen_host replace=\"replace\">0.0.0.0</listen_host></yandex>\n"
+            dest: /etc/clickhouse-server/config.d/80-lab-listen.xml
+            mode: "0644"
+          notify: Restart ClickHouse
+
+        - name: Enable and start ClickHouse
+          ansible.builtin.service:
+            name: clickhouse-server
+            enabled: true
+            state: started
+
+    - name: Apply ClickHouse configuration
+      ansible.builtin.meta: flush_handlers
+
+    - name: Initialize lab schema
+      when: not ansible_check_mode
+      block:
+        - name: Wait for native client
+          ansible.builtin.command: clickhouse-client --query "SELECT 1"
+          register: ch_ping
+          retries: 30
+          delay: 2
+          until: ch_ping.rc == 0
+          changed_when: false
+
+        - name: Check database
+          ansible.builtin.command: clickhouse-client --query "SELECT count() FROM system.databases WHERE name = 'logs'"
+          register: ch_database
+          changed_when: false
+
+        - name: Create logs database
+          ansible.builtin.command: clickhouse-client --query "CREATE DATABASE IF NOT EXISTS logs"
+          when: ch_database.stdout == '0'
+          changed_when: true
+
+        - name: Check table
+          ansible.builtin.command: clickhouse-client --query "EXISTS TABLE logs.events"
+          register: ch_table
+          changed_when: false
+
+        - name: Create events table
+          ansible.builtin.command: clickhouse-client --query "CREATE TABLE IF NOT EXISTS logs.events (message String) ENGINE = Log"
+          when: ch_table.stdout == '0'
+          changed_when: true
+  handlers:
+    - name: Restart ClickHouse
+      ansible.builtin.service:
+        name: clickhouse-server
+        state: restarted
+
+- name: Configure Vector
+  hosts: vector
+  gather_facts: false
+  become: true
+  tags: [vector]
+  tasks:
+    - name: Download pinned Vector package
+      ansible.builtin.get_url:
+        url: "https://apt.vector.dev/pool/v/ve/vector_{{ vector_version }}_amd64.deb"
+        checksum: "sha256:{{ vector_sha256 }}"
+        dest: "/var/cache/vector_{{ vector_version }}_amd64.deb"
+        mode: "0644"
+
+    - name: Inspect downloaded package
+      ansible.builtin.stat:
+        path: "/var/cache/vector_{{ vector_version }}_amd64.deb"
+      register: vector_deb
+
+    - name: Install Vector package
+      ansible.builtin.apt:
+        deb: "/var/cache/vector_{{ vector_version }}_amd64.deb"
+        policy_rc_d: 101
+      when: not ansible_check_mode or vector_deb.stat.exists
+
+    - name: Inspect Vector configuration directory
+      ansible.builtin.stat:
+        path: /etc/vector
+      register: vector_config_dir
+
+    - name: Configure installed Vector
+      when: not ansible_check_mode or vector_config_dir.stat.exists
+      block:
+        - name: Supply example input line
+          ansible.builtin.copy:
+            content: "ansible-lab-ready\n"
+            dest: /var/log/vector-lab.log
+            mode: "0644"
+
+        - name: Configure file source and ClickHouse sink
+          ansible.builtin.template:
+            src: vector.yaml.j2
+            dest: /etc/vector/vector.yaml
+            mode: "0644"
+            validate: "/usr/bin/vector validate --skip-healthchecks --config-yaml %s"
+          notify: Restart Vector
+
+        - name: Enable and start Vector
+          ansible.builtin.service:
+            name: vector
+            enabled: true
+            state: started
+
+    - name: Apply Vector configuration before testing
+      ansible.builtin.meta: flush_handlers
+
+    - name: Verify sample delivery to ClickHouse
+      ansible.builtin.uri:
+        url: "http://{{ clickhouse_endpoint_host }}:{{ clickhouse_endpoint_port }}/"
+        method: POST
+        body: "SELECT count() FROM logs.events WHERE message = 'ansible-lab-ready'"
+        return_content: true
+      register: vector_delivery
+      retries: 15
+      delay: 2
+      until: vector_delivery.status == 200 and vector_delivery.content | trim | int > 0
+      when: not ansible_check_mode
+  handlers:
+    - name: Restart Vector
+      ansible.builtin.service:
+        name: vector
+        state: restarted
+
+- name: Serve LightHouse with Nginx
+  hosts: lighthouse
+  gather_facts: false
+  become: true
+  tags: [lighthouse]
+  tasks:
+    - name: Install Nginx and archive tools
+      ansible.builtin.apt:
+        name: [nginx, tar, gzip]
+        state: present
+        update_cache: true
+        cache_valid_time: 86400
+        policy_rc_d: 101
+
+    - name: Download pinned LightHouse archive
+      ansible.builtin.get_url:
+        url: "https://codeload.github.com/VKCOM/lighthouse/tar.gz/{{ lighthouse_revision }}"
+        dest: "/var/cache/lighthouse-{{ lighthouse_revision }}.tar.gz"
+        checksum: "sha256:{{ lighthouse_sha256 }}"
+        mode: "0644"
+
+    - name: Inspect downloaded archive
+      ansible.builtin.stat:
+        path: "/var/cache/lighthouse-{{ lighthouse_revision }}.tar.gz"
+      register: lh_archive
+
+    - name: Extract versioned static site
+      ansible.builtin.unarchive:
+        src: "/var/cache/lighthouse-{{ lighthouse_revision }}.tar.gz"
+        dest: /var/www
+        remote_src: true
+        owner: root
+        group: root
+      when: not ansible_check_mode or lh_archive.stat.exists
+
+    - name: Inspect Nginx installation
+      ansible.builtin.stat:
+        path: /etc/nginx/conf.d
+      register: nginx_dir
+
+    - name: Configure installed Nginx
+      when: not ansible_check_mode or nginx_dir.stat.exists
+      block:
+        - name: Disable distribution default site
+          ansible.builtin.file:
+            path: /etc/nginx/sites-enabled/default
+            state: absent
+          notify: Reload Nginx
+
+        - name: Install LightHouse virtual host
+          ansible.builtin.template:
+            src: lighthouse.conf.j2
+            dest: /etc/nginx/conf.d/lighthouse.conf
+            mode: "0644"
+          notify: Reload Nginx
+
+        - name: Validate complete Nginx configuration
+          ansible.builtin.command: nginx -t
+          changed_when: false
+          when: not ansible_check_mode
+
+        - name: Enable and start Nginx
+          ansible.builtin.service:
+            name: nginx
+            enabled: true
+            state: started
+
+    - name: Apply Nginx configuration before testing
+      ansible.builtin.meta: flush_handlers
+
+    - name: Verify LightHouse page
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ lighthouse_port }}/"
+        return_content: true
+      register: lh_page
+      failed_when: "lh_page.status != 200 or '<title>LightHouse</title>' not in lh_page.content"
+      when: not ansible_check_mode
+
+    - name: Verify ClickHouse through Nginx
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ lighthouse_port }}/clickhouse/"
+        method: POST
+        body: SELECT 1
+        return_content: true
+      register: lh_sql
+      failed_when: "lh_sql.status != 200 or lh_sql.content | trim != '1'"
+      when: not ansible_check_mode
+  handlers:
+    - name: Reload Nginx
+      ansible.builtin.service:
+        name: nginx
+        state: reloaded
