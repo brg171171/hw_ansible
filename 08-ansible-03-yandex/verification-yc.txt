@@ -1,0 +1,17 @@
+Environment: Yandex Cloud | Debian lab | 2026-11-26 00:30:22 UTC
+Commit: 96015f1d02cb678c465ccaa1944562fe33bf3266
+
+check
+ch01                       : ok=5    changed=0    unreachable=0    failed=0    skipped=5    rescued=0    ignored=0
+lh01                       : ok=6    changed=2    unreachable=0    failed=0    skipped=7    rescued=0    ignored=0
+vec01                      : ok=7    changed=0    unreachable=0    failed=0    skipped=1    rescued=0    ignored=0
+
+first
+ch01                       : ok=8    changed=0    unreachable=0    failed=0    skipped=2    rescued=0    ignored=0
+lh01                       : ok=14   changed=6    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0
+vec01                      : ok=8    changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0
+
+second
+ch01                       : ok=8    changed=0    unreachable=0    failed=0    skipped=2    rescued=0    ignored=0
+lh01                       : ok=13   changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0
+vec01                      : ok=8    changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0
