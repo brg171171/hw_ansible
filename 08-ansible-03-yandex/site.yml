@@ -176,6 +176,19 @@
         path: "/var/cache/lighthouse-{{ lighthouse_revision }}.tar.gz"
       register: lh_archive
 
+    - name: Ensure static site parent directory exists
+      ansible.builtin.file:
+        path: /var/www
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Inspect actual static site parent directory
+      ansible.builtin.stat:
+        path: /var/www
+      register: lh_web_root
+
     - name: Extract versioned static site
       ansible.builtin.unarchive:
         src: "/var/cache/lighthouse-{{ lighthouse_revision }}.tar.gz"
@@ -183,7 +196,7 @@
         remote_src: true
         owner: root
         group: root
-      when: not ansible_check_mode or lh_archive.stat.exists
+      when: not ansible_check_mode or (lh_archive.stat.isreg | default(false) and lh_web_root.stat.isdir | default(false))
 
     - name: Inspect Nginx installation
       ansible.builtin.stat:

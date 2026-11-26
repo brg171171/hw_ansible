@@ -52,7 +52,7 @@ yc vpc security-group list
   sg=$(yc vpc security-group create --name a08-sg --network-id "$network" \
     --rule "direction=ingress,port=22,protocol=tcp,v4-cidrs=[$ADMIN_CIDR]" \
     --rule "direction=ingress,port=8123,protocol=tcp,predefined=self_security_group" \
-    --rule 'direction=egress,protocol=any,v4-cidrs=[0.0.0.0/0]' \
+    --rule 'direction=egress,protocol=any,from-port=0,to-port=65535,v4-cidrs=[0.0.0.0/0]' \
     --format json | jq -er '.id')
 
   for role in clickhouse vector lighthouse; do
@@ -92,12 +92,12 @@ yc_env=$(bash yc-inventory.sh) && eval "$yc_env"
 
 ### Запуск проверки в Yandex Cloud
 
-На управляющей машине с настроенным `yc` клонируйте репозиторий. Переключение на тег фиксирует код, для которого будет собран отчёт:
+На управляющей машине с настроенным `yc` используйте ветку `main`: в ней исправлен dry-run на чистом хосте с заранее скачанным архивом и без `/var/www`. Исходный тег остаётся без изменений; скрипт запишет SHA фактически проверенной версии в отчёт.
 
 ```bash
 git clone https://github.com/brg171171/hw_ansible.git
 cd hw_ansible
-git switch --detach 08-ansible-03-yandex
+git switch main
 cd 08-ansible-03-yandex
 python3 -m venv .venv
 source .venv/bin/activate
